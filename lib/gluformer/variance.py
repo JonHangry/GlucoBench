@@ -10,7 +10,8 @@ class Variance(nn.Module):
     self.dropout = nn.Dropout(r_drop) 
     self.activ1 = nn.ReLU()
     # + 1 (for seq) for embedded person token
-    self.proj2 = nn.Linear(len_seq+1, 1)
+    # self.proj2 = nn.Linear(len_seq+1, 1)
+    self.proj2 = nn.Linear(len_seq, 1)
     self.activ2 = nn.Tanh()
 
   def forward(self, x):

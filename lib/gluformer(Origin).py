@@ -17,7 +17,7 @@ from lib.gluformer.utils.evaluation import test
 from utils.darts_training import print_callback
 from utils.darts_processing import load_data, reshuffle_data
 from utils.darts_dataset import SamplingDatasetDual, SamplingDatasetInferenceDual
-from types import SimpleNamespace #传字典
+
 # define objective function
 def objective(trial):
     # set parameters
@@ -34,12 +34,8 @@ def objective(trial):
     max_samples_per_ts = trial.suggest_int("max_samples_per_ts", 50, 200, step=50)
     if max_samples_per_ts < 100:
         max_samples_per_ts = None # unlimited
-    # suggest hyperparameters: model  #暂时用少参数测试optuna
-    d_model = trial.suggest_int("d_model", 32, 512, step=32)
-    e_layers = trial.suggest_int("e_layer", 1, 5, step=1)
-    channel_independence = trial.suggest_int("channel_independence", 0, 1, step=1)
-    down_sampling_layers = trial.suggest_int("down_sampling_layers", 1, 2, step=1)
-    down_sampling_window = trial.suggest_int("down_sampling_window", 1, 2, step=1)
+    # suggest hyperparameters: model   先注释，尽可能少的参数让optuna跑起来
+    # d_model = trial.suggest_int("d_model", 256, 512, step=128)
     # n_heads = trial.suggest_int("n_heads", 4, 12, step=4)
     # d_fcn = trial.suggest_int("d_fcn", 512, 2048, step=128)
     # num_enc_layers = trial.suggest_int("num_enc_layers", 1, 4, step=1)
@@ -58,34 +54,21 @@ def objective(trial):
                                       output_chunk_length=out_len,
                                       input_chunk_length=in_len,
                                       use_static_covariates=True,)
-
-    configs = SimpleNamespace(
-        task_name='short_term_forecast',
-        seq_len=in_len,
-        label_len=label_len,
-        pred_len=out_len,
-        down_sampling_window=down_sampling_window,
-        down_sampling_layers=down_sampling_layers,
-        channel_independence=channel_independence,
-        moving_avg=25,
-        enc_in=1,
-        c_out=1,
-        use_future_temporal_feature=0,
-        e_layers=e_layers,
-        d_model=d_model,
-        d_ff=d_model,
-        dropout=0,
-        top_k=5,
-        r_drop=0.2,
-        decomp_method='moving_avg',
-        embed='timeF',
-        freq='t',
-        use_norm=1,
-        down_sampling_method='avg',
-    )
-
+    
     # build the NHiTSModel model
-    model = Gluformer(configs)
+    model = Gluformer(d_model = d_model, 
+                      n_heads = n_heads, 
+                      d_fcn = d_fcn, 
+                      r_drop = 0.2, 
+                      activ = 'relu', 
+                      num_enc_layers = num_enc_layers, 
+                      num_dec_layers = num_dec_layers,
+                      distil = True, 
+                      len_seq = in_len,
+                      label_len = label_len,
+                      len_pred = out_len,
+                      num_dynamic_features = num_dynamic_features,
+                      num_static_features = num_static_features,)
 
     # train the model
     model.fit(dataset_train,
@@ -134,7 +117,7 @@ if __name__ == '__main__':
     # define device
     device = torch.device(f'cuda:{args.gpu_id}' if torch.cuda.is_available() else 'cpu')
     # load data
-    study_file = f'../output/gluformer_{args.dataset}.txt'
+    study_file = f'./output/gluformer_{args.dataset}.txt'
     if not os.path.exists(study_file):
         with open(study_file, "w") as f:
             f.write(f"Optimization started at {datetime.datetime.now()}\n")
@@ -170,17 +153,12 @@ if __name__ == '__main__':
     max_samples_per_ts = best_params["max_samples_per_ts"]
     if max_samples_per_ts < 100:
         max_samples_per_ts = None # unlimited
-    # suggest hyperparameters: model    #暂时用少参数测试optuna
+    # suggest hyperparameters: model
     d_model = best_params["d_model"]
-    e_layers = best_params["e_layers"]
-    channel_independence = best_params["channel_independence"]
-    down_sampling_layers = best_params["down_sampling_layers"]
-    down_sampling_window = best_params["down_sampling_window"]
-    # d_model = best_params["d_model"]
-    # n_heads = best_params["n_heads"]
-    # d_fcn = best_params["d_fcn"]
-    # num_enc_layers = best_params["num_enc_layers"]
-    # num_dec_layers = best_params["num_dec_layers"]
+    n_heads = best_params["n_heads"]
+    d_fcn = best_params["d_fcn"]
+    num_enc_layers = best_params["num_enc_layers"]
+    num_dec_layers = best_params["num_dec_layers"]
 
     # Set model seed
     model_seeds = list(range(10, 20))
@@ -227,33 +205,20 @@ if __name__ == '__main__':
                                                             output_chunk_length=out_len,
                                                             use_static_covariates=True,
                                                             array_output_only=True)
-            configs = SimpleNamespace(
-                                    task_name='short_term_forecast',
-                                    seq_len=in_len,
-                                    label_len=label_len,
-                                    pred_len=out_len,
-                                    down_sampling_window=down_sampling_window,
-                                    down_sampling_layers=down_sampling_layers,
-                                    channel_independence=channel_independence,
-                                    moving_avg=25,
-                                    enc_in=1,
-                                    c_out=1,
-                                    use_future_temporal_feature=0,
-                                    e_layers=e_layers,
-                                    d_model=d_model,
-                                    d_ff=d_model,
-                                    dropout=0,
-                                    top_k=5,
-                                    r_drop=0.2,
-                                    decomp_method='moving_avg',
-                                    embed='timeF',
-                                    freq='t',
-                                    use_norm=1,
-                                    down_sampling_method='avg',
-                                )
-
             # build the NHiTSModel model
-            model = Gluformer(configs)
+            model = Gluformer(d_model = d_model, 
+                            n_heads = n_heads, 
+                            d_fcn = d_fcn, 
+                            r_drop = 0.2, 
+                            activ = 'relu', 
+                            num_enc_layers = num_enc_layers, 
+                            num_dec_layers = num_dec_layers,
+                            distil = True, 
+                            len_seq = in_len,
+                            label_len = label_len,
+                            len_pred = out_len,
+                            num_dynamic_features = num_dynamic_features,
+                            num_static_features = num_static_features,)
 
             # train the model
             model.fit(dataset_train,

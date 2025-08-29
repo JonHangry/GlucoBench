@@ -103,7 +103,7 @@ def load_data(seed = 0,
        Dictionary of scalers with key indicating the type of series (target or covariate).
     """
     # load data
-    with open(f'./config/{dataset}.yaml', 'r') as f:
+    with open(f'../config/{dataset}.yaml', 'r') as f:
         config = yaml.safe_load(f)
     config['split_params']['random_state'] = seed
     formatter = DataFormatter(config, study_file = study_file)
