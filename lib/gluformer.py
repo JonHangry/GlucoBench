@@ -105,7 +105,7 @@ def objective(trial):
     return avg_error
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', type=str, default='weinstock')
+parser.add_argument('--dataset', type=str, default='colas')
 parser.add_argument('--gpu_id', type=int, default=0)
 parser.add_argument('--optuna', type=str, default='True')
 parser.add_argument('--reduction1', type=str, default='mean')
