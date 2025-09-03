@@ -34,7 +34,7 @@ class EncoderLayer(nn.Module):
     self.activ = F.relu if activ == "relu" else F.gelu
 
   def forward(self, x):
-    new_x = self.att(x, x, x)
+    new_x = self.att(x, x, x)  #这里是传给attention的
     x = x + self.dropout(new_x)
 
     res = x = self.norm1(x)

@@ -34,6 +34,8 @@ def objective(trial):
     max_samples_per_ts = trial.suggest_int("max_samples_per_ts", 50, 200, step=50)
     if max_samples_per_ts < 100:
         max_samples_per_ts = None # unlimited
+
+
     # suggest hyperparameters: model   先注释，尽可能少的参数让optuna跑起来
     # d_model = trial.suggest_int("d_model", 256, 512, step=128)
     # n_heads = trial.suggest_int("n_heads", 4, 12, step=4)

@@ -122,7 +122,7 @@ def objective(trial):
     return avg_error
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', type=str, default='colas')
+parser.add_argument('--dataset', type=str, default='hall')
 parser.add_argument('--gpu_id', type=int, default=0)
 parser.add_argument('--optuna', type=str, default='True')
 parser.add_argument('--reduction1', type=str, default='mean')
@@ -171,16 +171,27 @@ if __name__ == '__main__':
     if max_samples_per_ts < 100:
         max_samples_per_ts = None # unlimited
     # suggest hyperparameters: model    #暂时用少参数测试optuna
-    d_model = best_params["d_model"]
-    e_layers = best_params["e_layers"]
-    channel_independence = best_params["channel_independence"]
-    down_sampling_layers = best_params["down_sampling_layers"]
-    down_sampling_window = best_params["down_sampling_window"]
+
+    # d_model = best_params["d_model"]
+    # e_layers = best_params["e_layers"]
+    # channel_independence = best_params["channel_independence"]
+    # down_sampling_layers = best_params["down_sampling_layers"]
+    # down_sampling_window = best_params["down_sampling_window"]
+
     # d_model = best_params["d_model"]
     # n_heads = best_params["n_heads"]
     # d_fcn = best_params["d_fcn"]
     # num_enc_layers = best_params["num_enc_layers"]
     # num_dec_layers = best_params["num_dec_layers"]
+    # optuna好了以后测试
+    in_len = 132
+    max_samples_per_ts = 100
+    d_model = 384
+    e_layers = 2
+    channel_independence = 0
+    down_sampling_layers = 2
+    down_sampling_window = 1
+
 
     # Set model seed
     model_seeds = list(range(10, 20))
