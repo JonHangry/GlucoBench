@@ -1,3 +1,4 @@
+
 Optimization started at 2023-03-22 17:28:57.405260
 --------------------------------
 Loading column definition...
