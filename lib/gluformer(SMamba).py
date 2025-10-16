@@ -36,10 +36,12 @@ def objective(trial):
         max_samples_per_ts = None # unlimited
     # suggest hyperparameters: model  #暂时用少参数测试optuna
     d_model = trial.suggest_int("d_model", 32, 512, step=32)
+    d_ff = trial.suggest_int("d_ff", 32, 512, step=32)
     e_layers = trial.suggest_int("e_layer", 1, 5, step=1)
-    channel_independence = trial.suggest_int("channel_independence", 0, 1, step=1)
-    down_sampling_layers = trial.suggest_int("down_sampling_layers", 1, 2, step=1)
-    down_sampling_window = trial.suggest_int("down_sampling_window", 1, 2, step=1)
+    d_state = trial.suggest_categorical("d_state", [4, 8, 16, 32])
+    # channel_independence = trial.suggest_int("channel_independence", 0, 1, step=1)
+    # down_sampling_layers = trial.suggest_int("down_sampling_layers", 1, 2, step=1)
+    # down_sampling_window = trial.suggest_int("down_sampling_window", 1, 2, step=1)
     # n_heads = trial.suggest_int("n_heads", 4, 12, step=4)
     # d_fcn = trial.suggest_int("d_fcn", 512, 2048, step=128)
     # num_enc_layers = trial.suggest_int("num_enc_layers", 1, 4, step=1)
@@ -60,28 +62,23 @@ def objective(trial):
                                       use_static_covariates=True,)
 
     configs = SimpleNamespace(
-        task_name='short_term_forecast',
         seq_len=in_len,
         label_len=label_len,
         pred_len=out_len,
-        down_sampling_window=down_sampling_window,
-        down_sampling_layers=down_sampling_layers,
-        channel_independence=channel_independence,
-        moving_avg=25,
+        output_attention=1,
         enc_in=1,
         c_out=1,
-        use_future_temporal_feature=0,
         e_layers=e_layers,
         d_model=d_model,
-        d_ff=d_model,
-        dropout=0,
+        d_ff=d_ff,
+        d_state=d_state,
+        dropout=0.1,
         top_k=5,
-        r_drop=0.2,
-        decomp_method='moving_avg',
         embed='timeF',
         freq='t',
         use_norm=1,
-        down_sampling_method='avg',
+        class_strategy='projection',
+        activation='gelu',
     )
 
     # build the NHiTSModel model
@@ -134,7 +131,6 @@ if __name__ == '__main__':
     # define device
     device = torch.device(f'cuda:{args.gpu_id}' if torch.cuda.is_available() else 'cpu')
     # load data
-    # 这里可能改路径
     study_file = f'./output/gluformer_{args.dataset}.txt'      #要更改的路径
     if not os.path.exists(study_file):
         with open(study_file, "w") as f:
@@ -174,11 +170,9 @@ if __name__ == '__main__':
     # suggest hyperparameters: model    #暂时用少参数测试optuna
     # 自动选择最好的参数
     d_model = best_params["d_model"]
+    d_ff = best_params["d_ff"]
     e_layers = best_params["e_layers"]
-    channel_independence = best_params["channel_independence"]
-    down_sampling_layers = best_params["down_sampling_layers"]
-    down_sampling_window = best_params["down_sampling_window"]
-
+    d_state = best_params["d_state"]
     # optuna好了以后测试
     # in_len = 132
     # max_samples_per_ts = 100
@@ -187,7 +181,6 @@ if __name__ == '__main__':
     # channel_independence = 0
     # down_sampling_layers = 2
     # down_sampling_window = 1
-
 
     # Set model seed
     model_seeds = list(range(10, 20))
@@ -235,14 +228,9 @@ if __name__ == '__main__':
                                                             use_static_covariates=True,
                                                             array_output_only=True)
             configs = SimpleNamespace(
-                                    task_name='short_term_forecast',
                                     seq_len=in_len,
                                     label_len=label_len,
                                     pred_len=out_len,
-                                    down_sampling_window=down_sampling_window,
-                                    down_sampling_layers=down_sampling_layers,
-                                    channel_independence=channel_independence,
-                                    moving_avg=25,
                                     enc_in=1,
                                     c_out=1,
                                     use_future_temporal_feature=0,
