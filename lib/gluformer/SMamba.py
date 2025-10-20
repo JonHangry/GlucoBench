@@ -6,7 +6,7 @@ import torch.nn as nn
 from layers.Mamba_EncDec import Encoder, EncoderLayer
 from layers.Embed import DataEmbedding_inverted
 from .variance import *
-
+import numpy as np
 from mamba_ssm import Mamba
 
 ############################################
@@ -27,7 +27,9 @@ class Gluformer(nn.Module):
     def __init__(self, configs):  # 暂时保留，之后说不定用def __init__(self, configs):
         super(Gluformer, self).__init__()
         self.seq_len = configs.seq_len
+        self.label_len = configs.seq_len
         self.pred_len = configs.pred_len
+        self.len_pred = configs.pred_len
         self.output_attention = configs.output_attention
         self.use_norm = configs.use_norm
         self.d_model = configs.d_model
@@ -62,7 +64,7 @@ class Gluformer(nn.Module):
         )
         self.projector = nn.Linear(configs.d_model, configs.pred_len, bias=True)
         # Train variance
-        self.var = Variance(configs.d_model, configs.r_drop, configs.len_seq)
+        self.var = Variance(configs.d_model, configs.r_drop, 6)
 
     def forecast(self, x_enc, x_mark_enc, x_dec, x_mark_dec):
         if self.use_norm:
@@ -74,6 +76,7 @@ class Gluformer(nn.Module):
 
         B, L, N = x_enc.shape  # B L N
         enc_out = self.enc_embedding(x_enc, x_mark_enc)  # covariates (e.g timestamp) can be also embedded as tokens
+        var_out = self.var(enc_out)
         enc_out, attns = self.encoder(enc_out, attn_mask=None)
         # B N E -> B N S -> B S N
         dec_out = self.projector(enc_out).permute(0, 2, 1)[:, :, :N]  # filter the covariates
@@ -82,7 +85,7 @@ class Gluformer(nn.Module):
             dec_out = dec_out * (stdev[:, 0, :].unsqueeze(1).repeat(1, self.pred_len, 1))
             dec_out = dec_out + (means[:, 0, :].unsqueeze(1).repeat(1, self.pred_len, 1))
 
-        return dec_out
+        return dec_out,var_out
 
 
     def forward(self, x_id, x_enc, x_mark_enc, x_dec, x_mark_dec):

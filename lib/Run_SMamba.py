@@ -12,12 +12,13 @@ from torch.utils.tensorboard import SummaryWriter
 # import data formatter
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from data_formatter.base import *
-from lib.gluformer.model import Gluformer
+from lib.gluformer.SMamba import Gluformer
 from lib.gluformer.utils.evaluation import test
 from utils.darts_training import print_callback
 from utils.darts_processing import load_data, reshuffle_data
 from utils.darts_dataset import SamplingDatasetDual, SamplingDatasetInferenceDual
 from types import SimpleNamespace #传字典
+
 # define objective function
 def objective(trial):
     # set parameters
@@ -37,7 +38,7 @@ def objective(trial):
     # suggest hyperparameters: model  #暂时用少参数测试optuna
     d_model = trial.suggest_int("d_model", 32, 512, step=32)
     d_ff = trial.suggest_int("d_ff", 32, 512, step=32)
-    e_layers = trial.suggest_int("e_layer", 1, 5, step=1)
+    e_layers = trial.suggest_int("e_layers", 1, 5, step=1)
     d_state = trial.suggest_categorical("d_state", [4, 8, 16, 32])
     # channel_independence = trial.suggest_int("channel_independence", 0, 1, step=1)
     # down_sampling_layers = trial.suggest_int("down_sampling_layers", 1, 2, step=1)
@@ -79,6 +80,7 @@ def objective(trial):
         use_norm=1,
         class_strategy='projection',
         activation='gelu',
+        r_drop=0.2,
     )
 
     # build the NHiTSModel model
@@ -131,7 +133,7 @@ if __name__ == '__main__':
     # define device
     device = torch.device(f'cuda:{args.gpu_id}' if torch.cuda.is_available() else 'cpu')
     # load data
-    study_file = f'./output/gluformer_{args.dataset}.txt'      #要更改的路径
+    study_file = f'./output/gluformer_{args.dataset}.txt'      #SUN:要更改的路径
     if not os.path.exists(study_file):
         with open(study_file, "w") as f:
             f.write(f"Optimization started at {datetime.datetime.now()}\n")
@@ -169,18 +171,17 @@ if __name__ == '__main__':
         max_samples_per_ts = None # unlimited
     # suggest hyperparameters: model    #暂时用少参数测试optuna
     # 自动选择最好的参数
-    d_model = best_params["d_model"]
-    d_ff = best_params["d_ff"]
-    e_layers = best_params["e_layers"]
-    d_state = best_params["d_state"]
+    # d_model = best_params["d_model"]
+    # d_ff = best_params["d_ff"]
+    # e_layers = best_params["e_layers"]
+    # d_state = best_params["d_state"]
     # optuna好了以后测试
-    # in_len = 132
-    # max_samples_per_ts = 100
-    # d_model = 384
-    # e_layers = 2
-    # channel_independence = 0
-    # down_sampling_layers = 2
-    # down_sampling_window = 1
+    in_len = 132
+    max_samples_per_ts = 50
+    d_model=64
+    e_layers=4
+    d_ff=448
+    d_state=8
 
     # Set model seed
     model_seeds = list(range(10, 20))
@@ -228,23 +229,24 @@ if __name__ == '__main__':
                                                             use_static_covariates=True,
                                                             array_output_only=True)
             configs = SimpleNamespace(
-                                    seq_len=in_len,
-                                    label_len=label_len,
-                                    pred_len=out_len,
-                                    enc_in=1,
-                                    c_out=1,
-                                    use_future_temporal_feature=0,
-                                    e_layers=e_layers,
-                                    d_model=d_model,
-                                    d_ff=d_model,
-                                    dropout=0,
-                                    top_k=5,
-                                    r_drop=0.2,
-                                    decomp_method='moving_avg',
-                                    embed='timeF',
-                                    freq='t',
-                                    use_norm=1,
-                                    down_sampling_method='avg',
+                                seq_len=in_len,
+                                label_len=label_len,
+                                pred_len=out_len,
+                                output_attention=1,
+                                enc_in=1,
+                                c_out=1,
+                                e_layers=e_layers,
+                                d_model=d_model,
+                                d_ff=d_ff,
+                                d_state=d_state,
+                                dropout=0.1,
+                                top_k=5,
+                                embed='timeF',
+                                freq='t',
+                                use_norm=1,
+                                class_strategy='projection',
+                                activation='gelu',
+                                r_drop=0.2,
                                 )
 
             # build the NHiTSModel model

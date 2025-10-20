@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 # import data formatter
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from data_formatter.base import *
-from lib.gluformer.model import Gluformer
+from lib.gluformer.TimeXer import TimeXer
 from lib.gluformer.utils.evaluation import test
 from utils.darts_training import print_callback
 from utils.darts_processing import load_data, reshuffle_data
@@ -25,9 +25,9 @@ def objective(trial):
     num_dynamic_features = series['train']['future'][-1].n_components
     num_static_features = series['train']['static'][-1].n_components
     writer = SummaryWriter(os.path.join(os.path.dirname(__file__), 
-                           f'../output/tensorboard_gluformer_{args.dataset}/run{trial.number}'))
+                           f'../output/tensorboard_TimeXer_{args.dataset}/run{trial.number}'))
     model_path = os.path.join(os.path.dirname(__file__),
-                              f'../output/tensorboard_gluformer_{args.dataset}/model.pt')
+                              f'../output/tensorboard_TimeXer_{args.dataset}/model.pt')
     # suggest hyperparameters: input size
     in_len = trial.suggest_int("in_len", 96, formatter.params['max_length_input'], step=12)
     label_len = in_len // 3
@@ -36,14 +36,8 @@ def objective(trial):
         max_samples_per_ts = None # unlimited
     # suggest hyperparameters: model  #暂时用少参数测试optuna
     d_model = trial.suggest_int("d_model", 32, 512, step=32)
-    e_layers = trial.suggest_int("e_layers", 1, 5, step=1)
-    channel_independence = trial.suggest_int("channel_independence", 0, 1, step=1)
-    down_sampling_layers = trial.suggest_int("down_sampling_layers", 1, 2, step=1)
-    down_sampling_window = trial.suggest_int("down_sampling_window", 1, 2, step=1)
-    # n_heads = trial.suggest_int("n_heads", 4, 12, step=4)
-    # d_fcn = trial.suggest_int("d_fcn", 512, 2048, step=128)
-    # num_enc_layers = trial.suggest_int("num_enc_layers", 1, 4, step=1)
-    # num_dec_layers = trial.suggest_int("num_dec_layers", 1, 4, step=1)
+    e_layers = trial.suggest_int("e_layer", 1, 5, step=1)
+    n_heads = trial.suggest_int("n_heads", 4, 8, step=4)
 
     # create datasets
     dataset_train = SamplingDatasetDual(series['train']['target'],
@@ -64,28 +58,31 @@ def objective(trial):
         seq_len=in_len,
         label_len=label_len,
         pred_len=out_len,
-        down_sampling_window=down_sampling_window,
-        down_sampling_layers=down_sampling_layers,
-        channel_independence=channel_independence,
+        features=1,
+        patch_len=12,
+        factor=1,
+        n_heads=n_heads,
+        activation='gelu',
+        e_layers = e_layers,
+        d_model = d_model,
+        d_ff=4*d_model,
+        use_norm = 1,
+        dropout=0,
+        embed='timeF',
+        freq='t',
+        # 以上是必需参数，以下是疑似不需要参数
         moving_avg=25,
         enc_in=1,
         c_out=1,
         use_future_temporal_feature=0,
-        e_layers=e_layers,
-        d_model=d_model,
-        d_ff=d_model,
-        dropout=0,
         top_k=5,
         r_drop=0.2,
         decomp_method='moving_avg',
-        embed='timeF',
-        freq='t',
-        use_norm=1,
         down_sampling_method='avg',
     )
 
     # build the NHiTSModel model
-    model = Gluformer(configs)
+    model = TimeXer(configs)
 
     # train the model
     model.fit(dataset_train,
@@ -134,8 +131,7 @@ if __name__ == '__main__':
     # define device
     device = torch.device(f'cuda:{args.gpu_id}' if torch.cuda.is_available() else 'cpu')
     # load data
-    # 这里可能改路径
-    study_file = f'./output/gluformer_{args.dataset}.txt'      #要更改的路径
+    study_file = f'../output/TimeXer_{args.dataset}.txt'      #要更改的路径
     if not os.path.exists(study_file):
         with open(study_file, "w") as f:
             f.write(f"Optimization started at {datetime.datetime.now()}\n")
@@ -151,7 +147,7 @@ if __name__ == '__main__':
     if args.optuna == 'True':
         study = optuna.create_study(direction="minimize")
         print_call = partial(print_callback, study_file=study_file)
-        study.optimize(objective, n_trials=30,
+        study.optimize(objective, n_trials=1,
                        callbacks=[print_call], 
                        catch=(np.linalg.LinAlgError, KeyError))
         best_params = study.best_trial.params
@@ -164,7 +160,7 @@ if __name__ == '__main__':
     num_dynamic_features = series['train']['future'][-1].n_components
     num_static_features = series['train']['static'][-1].n_components
     model_path = os.path.join(os.path.dirname(__file__),
-                              f'../output/tensorboard_gluformer_{args.dataset}/model.pt')
+                              f'../output/tensorboard_TimeXer_{args.dataset}/model.pt')
     # suggest hyperparameters: input size
     in_len = best_params["in_len"]
     label_len = in_len // 3
@@ -172,21 +168,20 @@ if __name__ == '__main__':
     if max_samples_per_ts < 100:
         max_samples_per_ts = None # unlimited
     # suggest hyperparameters: model    #暂时用少参数测试optuna
-    # 自动选择最好的参数
-    # d_model = best_params["d_model"]
-    # e_layers = best_params["e_layers"]
-    # channel_independence = best_params["channel_independence"]
-    # down_sampling_layers = best_params["down_sampling_layers"]
-    # down_sampling_window = best_params["down_sampling_window"]
+
+    d_model = best_params["d_model"]
+    e_layers = best_params["e_layers"]
+    n_heads = best_params["n_heads"]
 
     # optuna好了以后测试
-    in_len = 120
-    max_samples_per_ts = 50
-    d_model = 128
-    e_layers = 3
-    channel_independence = 0
-    down_sampling_layers = 1
-    down_sampling_window = 1
+    # in_len = 132
+    # max_samples_per_ts = 100
+    # d_model = 384
+    # e_layers = 2
+    # channel_independence = 0
+    # down_sampling_layers = 2
+    # down_sampling_window = 1
+
 
     # Set model seed
     model_seeds = list(range(10, 20))
@@ -203,7 +198,7 @@ if __name__ == '__main__':
         id_cal_errors_cv = []; ood_cal_errors_cv = []
         for seed in seeds:
             writer = SummaryWriter(os.path.join(os.path.dirname(__file__), 
-                           f'../output/tensorboard_gluformer_{args.dataset}/test_run{model_seed}_{seed}'))
+                           f'../output/tensorboard_TimeXer_{args.dataset}/test_run{model_seed}_{seed}'))
             formatter, series, scalers = reshuffle_data(formatter=formatter, 
                                                         seed=seed, 
                                                         use_covs=True,
@@ -238,16 +233,13 @@ if __name__ == '__main__':
                                     seq_len=in_len,
                                     label_len=label_len,
                                     pred_len=out_len,
-                                    down_sampling_window=down_sampling_window,
-                                    down_sampling_layers=down_sampling_layers,
-                                    channel_independence=channel_independence,
                                     moving_avg=25,
                                     enc_in=1,
                                     c_out=1,
                                     use_future_temporal_feature=0,
                                     e_layers=e_layers,
                                     d_model=d_model,
-                                    d_ff=d_model,
+                                    d_ff=4*d_model,
                                     dropout=0,
                                     top_k=5,
                                     r_drop=0.2,
@@ -259,7 +251,7 @@ if __name__ == '__main__':
                                 )
 
             # build the NHiTSModel model
-            model = Gluformer(configs)
+            model = TimeXer(configs)
 
             # train the model
             model.fit(dataset_train,
