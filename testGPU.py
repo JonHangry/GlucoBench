@@ -1,10 +1,10 @@
-# import torch
-#
-# print("可用 GPU 数量:", torch.cuda.device_count())
-# for i in range(torch.cuda.device_count()):
-#     print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
+import torch
 
-from mamba_ssm import Mamba
+print("可用 GPU 数量:", torch.cuda.device_count())
+for i in range(torch.cuda.device_count()):
+    print(f"GPU {i}: {torch.cuda.get_device_name(i)}")
+print(torch.cuda.is_available())
+# from mamba_ssm import Mamba
 
 # import torch
 # print("PyTorch 版本:", torch.__version__)
