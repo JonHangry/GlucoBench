@@ -36,7 +36,7 @@ def objective(trial):
         max_samples_per_ts = None # unlimited
     # suggest hyperparameters: model  #暂时用少参数测试optuna
     d_model = trial.suggest_int("d_model", 32, 512, step=32)
-    e_layers = trial.suggest_int("e_layer", 1, 5, step=1)
+    e_layers = trial.suggest_int("e_layers", 1, 5, step=1)
     n_heads = trial.suggest_int("n_heads", 4, 8, step=4)
 
     # create datasets
@@ -58,8 +58,8 @@ def objective(trial):
         seq_len=in_len,
         label_len=label_len,
         pred_len=out_len,
-        features=1,
-        patch_len=12,
+        features='M',
+        patch_len=1,
         factor=1,
         n_heads=n_heads,
         activation='gelu',
@@ -119,7 +119,7 @@ def objective(trial):
     return avg_error
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', type=str, default='dubosson')
+parser.add_argument('--dataset', type=str, default='iglu')
 parser.add_argument('--gpu_id', type=int, default=0)
 parser.add_argument('--optuna', type=str, default='True')
 parser.add_argument('--reduction1', type=str, default='mean')
@@ -131,7 +131,7 @@ if __name__ == '__main__':
     # define device
     device = torch.device(f'cuda:{args.gpu_id}' if torch.cuda.is_available() else 'cpu')
     # load data
-    study_file = f'../output/TimeXer_{args.dataset}.txt'      #要更改的路径
+    study_file = f'./output/TimeXer_{args.dataset}.txt'      #SUN:要更改的路径
     if not os.path.exists(study_file):
         with open(study_file, "w") as f:
             f.write(f"Optimization started at {datetime.datetime.now()}\n")
@@ -147,7 +147,7 @@ if __name__ == '__main__':
     if args.optuna == 'True':
         study = optuna.create_study(direction="minimize")
         print_call = partial(print_callback, study_file=study_file)
-        study.optimize(objective, n_trials=1,
+        study.optimize(objective, n_trials=30,
                        callbacks=[print_call], 
                        catch=(np.linalg.LinAlgError, KeyError))
         best_params = study.best_trial.params
@@ -168,20 +168,16 @@ if __name__ == '__main__':
     if max_samples_per_ts < 100:
         max_samples_per_ts = None # unlimited
     # suggest hyperparameters: model    #暂时用少参数测试optuna
-
-    d_model = best_params["d_model"]
-    e_layers = best_params["e_layers"]
-    n_heads = best_params["n_heads"]
+    # d_model = best_params["d_model"]
+    # e_layers = best_params["e_layers"]
+    # n_heads = best_params["n_heads"]
 
     # optuna好了以后测试
-    # in_len = 132
-    # max_samples_per_ts = 100
-    # d_model = 384
-    # e_layers = 2
-    # channel_independence = 0
-    # down_sampling_layers = 2
-    # down_sampling_window = 1
-
+    in_len = 192
+    max_samples_per_ts = 50
+    d_model = 32
+    e_layers = 3
+    n_heads = 8
 
     # Set model seed
     model_seeds = list(range(10, 20))
@@ -229,26 +225,32 @@ if __name__ == '__main__':
                                                             use_static_covariates=True,
                                                             array_output_only=True)
             configs = SimpleNamespace(
-                                    task_name='short_term_forecast',
-                                    seq_len=in_len,
-                                    label_len=label_len,
-                                    pred_len=out_len,
-                                    moving_avg=25,
-                                    enc_in=1,
-                                    c_out=1,
-                                    use_future_temporal_feature=0,
-                                    e_layers=e_layers,
-                                    d_model=d_model,
-                                    d_ff=4*d_model,
-                                    dropout=0,
-                                    top_k=5,
-                                    r_drop=0.2,
-                                    decomp_method='moving_avg',
-                                    embed='timeF',
-                                    freq='t',
-                                    use_norm=1,
-                                    down_sampling_method='avg',
-                                )
+                task_name='short_term_forecast',
+                seq_len=in_len,
+                label_len=label_len,
+                pred_len=out_len,
+                features='M',
+                patch_len=1,
+                factor=1,
+                n_heads=n_heads,
+                activation='gelu',
+                e_layers=e_layers,
+                d_model=d_model,
+                d_ff=4 * d_model,
+                use_norm=1,
+                dropout=0,
+                embed='timeF',
+                freq='t',
+                # 以上是必需参数，以下是疑似不需要参数
+                moving_avg=25,
+                enc_in=1,
+                c_out=1,
+                use_future_temporal_feature=0,
+                top_k=5,
+                r_drop=0.2,
+                decomp_method='moving_avg',
+                down_sampling_method='avg',
+            )
 
             # build the NHiTSModel model
             model = TimeXer(configs)
