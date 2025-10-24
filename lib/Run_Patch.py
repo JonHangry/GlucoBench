@@ -12,7 +12,7 @@ from torch.utils.tensorboard import SummaryWriter
 # import data formatter
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from data_formatter.base import *
-from lib.gluformer.iTransformer import iTrans
+from lib.gluformer.PatchTST import PTST
 from lib.gluformer.utils.evaluation import test
 from utils.darts_training import print_callback
 from utils.darts_processing import load_data, reshuffle_data
@@ -54,7 +54,7 @@ def objective(trial):
                                       use_static_covariates=True,)
 
     configs = SimpleNamespace(
-        task_name='short_term_forecast',
+        enc_in=1,
         seq_len=in_len,
         label_len=label_len,
         pred_len=out_len,
@@ -69,22 +69,30 @@ def objective(trial):
         d_model = d_model,
         d_ff=4*d_model,
         use_norm = 1,
-        dropout=0,
         embed='timeF',
         freq='t',
-        # 以上是必需参数，以下是疑似不需要参数
         moving_avg=25,
-        enc_in=1,
         c_out=1,
         use_future_temporal_feature=0,
         top_k=5,
         r_drop=0.2,
+        dropout=0,
+        fc_dropout=0,
+        head_dropout=0,
         decomp_method='moving_avg',
         down_sampling_method='avg',
+        individual=False,
+        stride=8,
+        padding_patch='end',
+        revin=1,
+        affine=0,
+        subtract_last=0,
+        decomposition=0,
+        kernel_size=25,
     )
 
     # build the NHiTSModel model
-    model = iTrans(configs)
+    model = PTST(configs)
 
     # train the model
     model.fit(dataset_train,
@@ -227,37 +235,45 @@ if __name__ == '__main__':
                                                             use_static_covariates=True,
                                                             array_output_only=True)
             configs = SimpleNamespace(
-                task_name='short_term_forecast',
-                seq_len=in_len,
-                label_len=label_len,
-                pred_len=out_len,
-                features='M',
-                patch_len=1,
-                output_attention=1,
-                class_strategy='projection',
-                factor=1,
-                n_heads=n_heads,
-                activation='gelu',
-                e_layers=e_layers,
-                d_model=d_model,
-                d_ff=4 * d_model,
-                use_norm=1,
-                dropout=0,
-                embed='timeF',
-                freq='t',
-                # 以上是必需参数，以下是疑似不需要参数
-                moving_avg=25,
-                enc_in=1,
-                c_out=1,
-                use_future_temporal_feature=0,
-                top_k=5,
-                r_drop=0.2,
-                decomp_method='moving_avg',
-                down_sampling_method='avg',
-            )
+                        enc_in=1,
+                        seq_len=in_len,
+                        label_len=label_len,
+                        pred_len=out_len,
+                        output_attention=1,
+                        class_strategy='projection',
+                        features='M',
+                        patch_len=1,
+                        factor=1,
+                        n_heads=n_heads,
+                        activation='gelu',
+                        e_layers = e_layers,
+                        d_model = d_model,
+                        d_ff=4*d_model,
+                        use_norm = 1,
+                        embed='timeF',
+                        freq='t',
+                        moving_avg=25,
+                        c_out=1,
+                        use_future_temporal_feature=0,
+                        top_k=5,
+                        r_drop=0.2,
+                        dropout=0,
+                        fc_dropout=0,
+                        head_dropout=0,
+                        decomp_method='moving_avg',
+                        down_sampling_method='avg',
+                        individual=False,
+                        stride=8,
+                        padding_patch='end',
+                        revin=1,
+                        affine=0,
+                        subtract_last=0,
+                        decomposition=0,
+                        kernel_size=25,
+    )
 
             # build the NHiTSModel model
-            model = iTrans(configs)
+            model = PTST(configs)
 
             # train the model
             model.fit(dataset_train,
