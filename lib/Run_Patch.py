@@ -17,15 +17,17 @@ from lib.gluformer.utils.evaluation import test
 from utils.darts_training import print_callback
 from utils.darts_processing import load_data, reshuffle_data
 from utils.darts_dataset import SamplingDatasetDual, SamplingDatasetInferenceDual
-from types import SimpleNamespace #传字典
+from types import SimpleNamespace  # 传字典
+
+
 # define objective function
 def objective(trial):
     # set parameters
     out_len = formatter.params['length_pred']
     num_dynamic_features = series['train']['future'][-1].n_components
     num_static_features = series['train']['static'][-1].n_components
-    writer = SummaryWriter(os.path.join(os.path.dirname(__file__), 
-                           f'../output/tensorboard_TimeXer_{args.dataset}/run{trial.number}'))
+    writer = SummaryWriter(os.path.join(os.path.dirname(__file__),
+                                        f'../output/tensorboard_TimeXer_{args.dataset}/run{trial.number}'))
     model_path = os.path.join(os.path.dirname(__file__),
                               f'../output/tensorboard_TimeXer_{args.dataset}/model.pt')
     # suggest hyperparameters: input size
@@ -33,11 +35,11 @@ def objective(trial):
     label_len = in_len // 3
     max_samples_per_ts = trial.suggest_int("max_samples_per_ts", 50, 200, step=50)
     if max_samples_per_ts < 100:
-        max_samples_per_ts = None # unlimited
+        max_samples_per_ts = None  # unlimited
     # suggest hyperparameters: model  #暂时用少参数测试optuna
     d_model = trial.suggest_int("d_model", 32, 256, step=32)
     e_layers = trial.suggest_int("e_layers", 1, 2, step=1)
-    n_heads = trial.suggest_int("n_heads", 1, 4, step=1)
+    n_heads = trial.suggest_int("n_heads", 2, 4, step=2)
 
     # create datasets
     dataset_train = SamplingDatasetDual(series['train']['target'],
@@ -48,10 +50,10 @@ def objective(trial):
                                         max_samples_per_ts=max_samples_per_ts,
                                         )
     dataset_val = SamplingDatasetDual(series['val']['target'],
-                                      series['val']['future'],   
+                                      series['val']['future'],
                                       output_chunk_length=out_len,
                                       input_chunk_length=in_len,
-                                      use_static_covariates=True,)
+                                      use_static_covariates=True, )
 
     configs = SimpleNamespace(
         enc_in=1,
@@ -65,10 +67,10 @@ def objective(trial):
         factor=1,
         n_heads=n_heads,
         activation='gelu',
-        e_layers = e_layers,
-        d_model = d_model,
-        d_ff=4*d_model,
-        use_norm = 1,
+        e_layers=e_layers,
+        d_model=d_model,
+        d_ff=4 * d_model,
+        use_norm=1,
         embed='timeF',
         freq='t',
         moving_avg=25,
@@ -97,14 +99,14 @@ def objective(trial):
     # train the model
     model.fit(dataset_train,
               dataset_val,
-              learning_rate = 1e-4,
-              batch_size = 32,
-              epochs = 100,
-              num_samples = 1,
-              device = device,
-              model_path = model_path,
-              trial = None,
-              logger = writer)
+              learning_rate=1e-4,
+              batch_size=32,
+              epochs=100,
+              num_samples=1,
+              device=device,
+              model_path=model_path,
+              trial=None,
+              logger=writer)
 
     # predict on the validation set
     dataset_val = SamplingDatasetInferenceDual(target_series=series['val']['target'],
@@ -116,22 +118,23 @@ def objective(trial):
     predictions, logvar = model.predict(dataset_val,
                                         batch_size=32,
                                         num_samples=3,
-                                        device=device,)
+                                        device=device, )
     trues = np.array([dataset_val.evalsample(i).values() for i in range(len(dataset_val))])
     # rescale predictions
     trues = (trues - scalers['target'].min_) / scalers['target'].scale_
     predictions = (predictions - scalers['target'].min_) / scalers['target'].scale_
-    var = np.exp(logvar) / scalers['target'].scale_**2
+    var = np.exp(logvar) / scalers['target'].scale_ ** 2
     # test
     errors, _, _ = test(trues, predictions, var=var)
     avg_error = np.mean(errors[:, 1])
 
     return avg_error
 
+
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', type=str, default='iglu')
+parser.add_argument('--dataset', type=str, default='weinstock')
 parser.add_argument('--gpu_id', type=int, default=0)
-parser.add_argument('--optuna', type=str, default='True')
+parser.add_argument('--optuna', type=str, default='False')
 parser.add_argument('--reduction1', type=str, default='mean')
 parser.add_argument('--reduction2', type=str, default='median')
 parser.add_argument('--reduction3', type=str, default=None)
@@ -141,24 +144,24 @@ if __name__ == '__main__':
     # define device
     device = torch.device(f'cuda:{args.gpu_id}' if torch.cuda.is_available() else 'cpu')
     # load data
-    study_file = f'./output/iTrans_{args.dataset}.txt'      #SUN:要更改的路径
+    study_file = f'./output/PatchTST_{args.dataset}.txt'  # SUN:要更改的路径
     if not os.path.exists(study_file):
         with open(study_file, "w") as f:
             f.write(f"Optimization started at {datetime.datetime.now()}\n")
-    formatter, series, scalers = load_data(seed=0, 
-                                           study_file=study_file, 
+    formatter, series, scalers = load_data(seed=0,
+                                           study_file=study_file,
                                            dataset=args.dataset,
-                                           use_covs=True, 
+                                           use_covs=True,
                                            cov_type='dual',
                                            use_static_covs=True)
-    
+
     # hyperparameter optimization
     best_params = None
     if args.optuna == 'True':
         study = optuna.create_study(direction="minimize")
         print_call = partial(print_callback, study_file=study_file)
         study.optimize(objective, n_trials=30,
-                       callbacks=[print_call], 
+                       callbacks=[print_call],
                        catch=(np.linalg.LinAlgError, KeyError))
         best_params = study.best_trial.params
     else:
@@ -176,37 +179,41 @@ if __name__ == '__main__':
     label_len = in_len // 3
     max_samples_per_ts = best_params["max_samples_per_ts"]
     if max_samples_per_ts < 100:
-        max_samples_per_ts = None # unlimited
+        max_samples_per_ts = None  # unlimited
     # suggest hyperparameters: model    #暂时用少参数测试optuna
-    d_model = best_params["d_model"]
-    e_layers = best_params["e_layers"]
-    n_heads = best_params["n_heads"]
+    # d_model = best_params["d_model"]
+    # e_layers = best_params["e_layers"]
+    # n_heads = best_params["n_heads"]
 
     # optuna好了以后测试
-    # in_len = 192
-    # max_samples_per_ts = 50
-    # d_model = 32
-    # e_layers = 3
-    # n_heads = 8
+    in_len = 132
+    max_samples_per_ts = 150
+    d_model = 64
+    e_layers = 1
+    n_heads = 2
 
     # Set model seed
     model_seeds = list(range(10, 20))
     id_errors_model = {key: [] for key in reductions if key is not None}
     ood_errors_model = {key: [] for key in reductions if key is not None}
-    id_likelihoods_model = []; ood_likelihoods_model = []
-    id_cal_errors_model = []; ood_cal_errors_model = []
+    id_likelihoods_model = [];
+    ood_likelihoods_model = []
+    id_cal_errors_model = [];
+    ood_cal_errors_model = []
     for model_seed in model_seeds:
         # Backtest on the test set
         seeds = list(range(1, 3))
         id_errors_cv = {key: [] for key in reductions if key is not None}
         ood_errors_cv = {key: [] for key in reductions if key is not None}
-        id_likelihoods_cv = []; ood_likelihoods_cv = []
-        id_cal_errors_cv = []; ood_cal_errors_cv = []
+        id_likelihoods_cv = [];
+        ood_likelihoods_cv = []
+        id_cal_errors_cv = [];
+        ood_cal_errors_cv = []
         for seed in seeds:
-            writer = SummaryWriter(os.path.join(os.path.dirname(__file__), 
-                           f'../output/tensorboard_TimeXer_{args.dataset}/test_run{model_seed}_{seed}'))
-            formatter, series, scalers = reshuffle_data(formatter=formatter, 
-                                                        seed=seed, 
+            writer = SummaryWriter(os.path.join(os.path.dirname(__file__),
+                                                f'../output/tensorboard_TimeXer_{args.dataset}/test_run{model_seed}_{seed}'))
+            formatter, series, scalers = reshuffle_data(formatter=formatter,
+                                                        seed=seed,
                                                         use_covs=True,
                                                         cov_type='past',
                                                         use_static_covs=True)
@@ -216,12 +223,12 @@ if __name__ == '__main__':
                                                 output_chunk_length=out_len,
                                                 input_chunk_length=in_len,
                                                 use_static_covariates=True,
-                                                max_samples_per_ts=max_samples_per_ts,)
+                                                max_samples_per_ts=max_samples_per_ts, )
             dataset_val = SamplingDatasetDual(series['val']['target'],
-                                              series['val']['future'],   
+                                              series['val']['future'],
                                               output_chunk_length=out_len,
                                               input_chunk_length=in_len,
-                                              use_static_covariates=True,)
+                                              use_static_covariates=True, )
             dataset_test = SamplingDatasetInferenceDual(target_series=series['test']['target'],
                                                         covariates=series['test']['future'],
                                                         input_chunk_length=in_len,
@@ -235,42 +242,42 @@ if __name__ == '__main__':
                                                             use_static_covariates=True,
                                                             array_output_only=True)
             configs = SimpleNamespace(
-                        enc_in=1,
-                        seq_len=in_len,
-                        label_len=label_len,
-                        pred_len=out_len,
-                        output_attention=1,
-                        class_strategy='projection',
-                        features='M',
-                        patch_len=1,
-                        factor=1,
-                        n_heads=n_heads,
-                        activation='gelu',
-                        e_layers = e_layers,
-                        d_model = d_model,
-                        d_ff=4*d_model,
-                        use_norm = 1,
-                        embed='timeF',
-                        freq='t',
-                        moving_avg=25,
-                        c_out=1,
-                        use_future_temporal_feature=0,
-                        top_k=5,
-                        r_drop=0.2,
-                        dropout=0,
-                        fc_dropout=0,
-                        head_dropout=0,
-                        decomp_method='moving_avg',
-                        down_sampling_method='avg',
-                        individual=False,
-                        stride=8,
-                        padding_patch='end',
-                        revin=1,
-                        affine=0,
-                        subtract_last=0,
-                        decomposition=0,
-                        kernel_size=25,
-    )
+                enc_in=1,
+                seq_len=in_len,
+                label_len=label_len,
+                pred_len=out_len,
+                output_attention=1,
+                class_strategy='projection',
+                features='M',
+                patch_len=1,
+                factor=1,
+                n_heads=n_heads,
+                activation='gelu',
+                e_layers=e_layers,
+                d_model=d_model,
+                d_ff=4 * d_model,
+                use_norm=1,
+                embed='timeF',
+                freq='t',
+                moving_avg=25,
+                c_out=1,
+                use_future_temporal_feature=0,
+                top_k=5,
+                r_drop=0.2,
+                dropout=0,
+                fc_dropout=0,
+                head_dropout=0,
+                decomp_method='moving_avg',
+                down_sampling_method='avg',
+                individual=False,
+                stride=8,
+                padding_patch='end',
+                revin=1,
+                affine=0,
+                subtract_last=0,
+                decomposition=0,
+                kernel_size=25,
+            )
 
             # build the NHiTSModel model
             model = PTST(configs)
@@ -278,40 +285,40 @@ if __name__ == '__main__':
             # train the model
             model.fit(dataset_train,
                       dataset_val,
-                      learning_rate = 1e-4,
-                      batch_size = 32,
-                      epochs = 100,
-                      num_samples = 1,
-                      device = device,
-                      model_path = model_path,
-                      trial = None,
-                      logger = writer)
+                      learning_rate=1e-4,
+                      batch_size=32,
+                      epochs=100,
+                      num_samples=1,
+                      device=device,
+                      model_path=model_path,
+                      trial=None,
+                      logger=writer)
 
             # backtest on the test set
             predictions, logvar = model.predict(dataset_test,
                                                 batch_size=32,
                                                 num_samples=3,
-                                                device=device,)
+                                                device=device, )
             trues = np.array([dataset_test.evalsample(i).values() for i in range(len(dataset_test))])
             trues = (trues - scalers['target'].min_) / scalers['target'].scale_
             predictions = (predictions - scalers['target'].min_) / scalers['target'].scale_
-            var = np.exp(logvar) / scalers['target'].scale_**2
+            var = np.exp(logvar) / scalers['target'].scale_ ** 2
             id_errors_sample, id_likelihood_sample, id_cal_errors_sample = test(trues, predictions, var=var)
 
             # backtest on the ood test set
             predictions, logvar = model.predict(dataset_test_ood,
                                                 batch_size=32,
                                                 num_samples=3,
-                                                device=device,)
+                                                device=device, )
             trues = np.array([dataset_test_ood.evalsample(i).values() for i in range(len(dataset_test_ood))])
             trues = (trues - scalers['target'].min_) / scalers['target'].scale_
             predictions = (predictions - scalers['target'].min_) / scalers['target'].scale_
-            var = np.exp(logvar) / scalers['target'].scale_**2
+            var = np.exp(logvar) / scalers['target'].scale_ ** 2
             ood_errors_sample, ood_likelihood_sample, ood_cal_errors_sample = test(trues, predictions, var=var)
-            
+
             # compute, save, and print results
             with open(study_file, "a") as f:
-                for reduction in reductions:  
+                for reduction in reductions:
                     if reduction is not None:
                         # compute
                         reduction_f = getattr(np, reduction)
@@ -321,8 +328,10 @@ if __name__ == '__main__':
                         id_errors_cv[reduction].append(id_errors_sample_red)
                         ood_errors_cv[reduction].append(ood_errors_sample_red)
                         # print
-                        f.write(f"\t\tModel Seed: {model_seed} Seed: {seed} ID {reduction} of (MSE, MAE): {id_errors_sample_red}\n")
-                        f.write(f"\t\tModel Seed: {model_seed} Seed: {seed} OOD {reduction} of (MSE, MAE) stats: {ood_errors_sample_red}\n")
+                        f.write(
+                            f"\t\tModel Seed: {model_seed} Seed: {seed} ID {reduction} of (MSE, MAE): {id_errors_sample_red}\n")
+                        f.write(
+                            f"\t\tModel Seed: {model_seed} Seed: {seed} OOD {reduction} of (MSE, MAE) stats: {ood_errors_sample_red}\n")
                 # save
                 id_likelihoods_cv.append(id_likelihood_sample)
                 ood_likelihoods_cv.append(ood_likelihood_sample)
@@ -366,7 +375,7 @@ if __name__ == '__main__':
             f.write(f"\tModel Seed: {model_seed} OOD likelihoods: {ood_likelihoods_cv}\n")
             f.write(f"\tModel Seed: {model_seed} ID calibration errors: {id_cal_errors_cv}\n")
             f.write(f"\tModel Seed: {model_seed} OOD calibration errors: {ood_cal_errors_cv}\n")
-                
+
     # compute, save, and print results
     with open(study_file, "a") as f:
         for reduction in reductions:

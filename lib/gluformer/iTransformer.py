@@ -59,7 +59,7 @@ class iTrans(nn.Module):
         self.projector = nn.Linear(configs.d_model, configs.pred_len, bias=True)
 
         # Train variance
-        self.var = Variance(configs.d_model, configs.r_drop, configs.seq_len)
+        self.var = Variance(configs.d_model, configs.r_drop, 5)
 
     def forecast(self, x_enc, x_mark_enc, x_dec, x_mark_dec):
         if self.use_norm:

@@ -119,7 +119,7 @@ def objective(trial):
     return avg_error
 
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', type=str, default='iglu')
+parser.add_argument('--dataset', type=str, default='dubosson')
 parser.add_argument('--gpu_id', type=int, default=0)
 parser.add_argument('--optuna', type=str, default='True')
 parser.add_argument('--reduction1', type=str, default='mean')
@@ -168,16 +168,16 @@ if __name__ == '__main__':
     if max_samples_per_ts < 100:
         max_samples_per_ts = None # unlimited
     # suggest hyperparameters: model    #暂时用少参数测试optuna
-    # d_model = best_params["d_model"]
-    # e_layers = best_params["e_layers"]
-    # n_heads = best_params["n_heads"]
+    d_model = best_params["d_model"]
+    e_layers = best_params["e_layers"]
+    n_heads = best_params["n_heads"]
 
     # optuna好了以后测试
-    in_len = 192
-    max_samples_per_ts = 50
-    d_model = 32
-    e_layers = 3
-    n_heads = 8
+    # in_len = 96
+    # max_samples_per_ts = 50
+    # d_model = 480
+    # e_layers = 5
+    # n_heads = 8
 
     # Set model seed
     model_seeds = list(range(10, 20))
